@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>旅遊規劃 - V15.20 首爾 6 天 5 夜</title>
+    <title>旅遊規劃 - V15.21 拖曳強化版</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -31,6 +31,7 @@
         .poster-font { font-weight: 900 !important; letter-spacing: -0.01em; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
+        /* 質感方塊天數 */
         .day-btn {
             background-color: white; color: #64748B; border: 1.5px solid var(--color-border);
             width: 60px; height: 72px; border-radius: 12px; flex-shrink: 0;
@@ -48,6 +49,7 @@
             overflow: visible;
         }
 
+        /* 雙線機票視覺：纖薄質感 */
         .flight-ticket {
             border-radius: 18px; position: relative;
             border: 1px solid rgba(15, 23, 42, 0.05);
@@ -89,8 +91,23 @@
 
         .active-tab { color: var(--color-black); border-bottom: 4px solid var(--color-black); font-weight: 900; }
         .modal-overlay { background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 2000; }
-        .drag-handle { cursor: grab; padding: 10px; color: var(--color-border); font-size: 18px; z-index: 10; }
         
+        /* 拖曳手把強化區：加大感應與修正行為 */
+        .drag-handle { 
+            cursor: grab; 
+            padding: 12px 10px; /* 加大感應區 */
+            color: var(--color-border); 
+            font-size: 18px; 
+            z-index: 10; 
+            touch-action: none; /* 核心修正：禁止瀏覽器默認觸摸行為，解決拖曳卡頓 */
+            -webkit-user-select: none;
+        }
+        .drag-handle:active { cursor: grabbing; color: var(--color-black); }
+        
+        /* 正在被拖曳的樣式 */
+        .sortable-ghost { opacity: 0.3; background: var(--color-grey-light) !important; border: 2px dashed var(--color-black); }
+        .sortable-chosen { transform: scale(1.02); box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+
         .transport-row {
             display: flex; align-items: center; background: white; padding: 8px 12px;
             border-radius: 16px; border: 1px solid var(--color-border); width: 100%;
@@ -133,13 +150,13 @@
 <body>
     <div id="app" class="max-w-md mx-auto min-h-screen relative flex flex-col bg-[#F8F9FB] shadow-2xl">
         
-        <!-- 雲端載入 -->
+        <!-- 雲端同步狀態 -->
         <div v-if="isLoading" class="flex-1 flex flex-col items-center justify-center bg-white z-[3000]">
             <div class="relative w-16 h-16 mb-6">
                 <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-slate-800"></div>
                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl">🌍</div>
             </div>
-            <p class="text-xs font-black text-slate-400 tracking-[0.4em] uppercase italic">Setting up Seoul Trip...</p>
+            <p class="text-xs font-black text-slate-400 tracking-[0.4em] uppercase italic">Optimizing Engine...</p>
         </div>
 
         <!-- 初始建立頁 -->
@@ -165,7 +182,7 @@
             <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-6 pt-6 border-b border-slate-100 shadow-sm">
                 <div class="flex justify-between items-start mb-5">
                     <div class="flex items-center min-w-0 flex-1">
-                        <button @click="showTripList = true" class="p-2 -ml-2 text-slate-400 hover:text-slate-900 transition-colors"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+                        <button @click="showTripList = true" class="p-2 -ml-2 text-slate-400 hover:text-slate-900"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
                         <div class="ml-2 flex-1 min-w-0">
                             <input v-model="currentTrip.destination" @change="save" class="text-2xl poster-font text-slate-900 bg-transparent outline-none w-full border-none focus:ring-0">
                         </div>
@@ -200,26 +217,26 @@
                 <!-- 行程分頁 -->
                 <div v-show="currentTab === 'schedule'" class="space-y-4 pt-5">
                     <div class="flex justify-center space-x-3 mb-2">
-                        <button @click="addItem('activity')" class="px-5 py-2 bg-white border border-slate-200 text-slate-700 text-[10px] poster-font rounded-2xl shadow-sm">+ 行程點</button>
-                        <button @click="addItem('transport')" class="px-5 py-2 bg-white border border-slate-200 text-slate-700 text-[10px] poster-font rounded-2xl shadow-sm">+ 交通</button>
-                        <button @click="addItem('flight')" class="px-5 py-2 bg-white border border-slate-200 text-slate-700 text-[10px] poster-font rounded-2xl shadow-sm">+ 機票</button>
+                        <button @click="addItem('activity')" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-[10px] poster-font rounded-2xl shadow-sm">+ 行程點</button>
+                        <button @click="addItem('transport')" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-[10px] poster-font rounded-2xl shadow-sm">+ 交通</button>
+                        <button @click="addItem('flight')" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-[10px] poster-font rounded-2xl shadow-sm">+ 機票</button>
                     </div>
 
-                    <div id="sortable-schedule" class="space-y-5">
+                    <div id="sortable-schedule" class="space-y-5 min-h-[100px]">
                         <div v-for="(item, idx) in activeDay.items" :key="item.id" :data-id="item.id">
                             
-                            <!-- 纖薄機票票卷 -->
+                            <!-- 機票票卷 -->
                             <div v-if="item.type === 'flight'" 
                                 class="flight-ticket px-6 py-3.5 space-y-2.5 mx-auto w-full"
                                 :class="item.flightType === 'domestic' ? 'flight-dom' : 'flight-intl'">
                                 
                                 <div class="flex justify-between items-center">
-                                    <div class="flex bg-black/5 p-0.5 rounded-lg">
+                                    <div class="flex bg-black/10 p-0.5 rounded-lg">
                                         <button @click="item.flightType = 'domestic'; save();" class="line-toggle-btn" :class="item.flightType === 'domestic' ? 'line-active' : 'line-inactive'">國內線</button>
                                         <button @click="item.flightType = 'international'; save();" class="line-toggle-btn" :class="item.flightType === 'international' ? 'line-active' : 'line-inactive'">國際線</button>
                                     </div>
                                     <div class="flex items-center">
-                                        <div class="drag-handle opacity-30 mr-1 p-0">::</div>
+                                        <div class="drag-handle opacity-50 mr-1">::</div>
                                         <button @click="requestRemoveItem(idx)" class="opacity-40 p-1 text-lg">×</button>
                                     </div>
                                 </div>
@@ -246,7 +263,7 @@
 
                             <!-- 交通橫排 -->
                             <div v-else-if="item.type === 'transport'" class="transport-row">
-                                <div class="drag-handle px-1 opacity-40">::</div>
+                                <div class="drag-handle opacity-60">::</div>
                                 <div class="trans-time-box">
                                     <input v-model="item.time" @change="save" type="time" class="text-[10px] font-black bg-slate-50 p-1.5 rounded-lg text-slate-700 w-full outline-none">
                                     <span class="text-slate-300">~</span>
@@ -265,33 +282,33 @@
                             </div>
 
                             <!-- 行程卡片 -->
-                            <div v-else class="rich-card p-3.5 space-y-3.5">
-                                <div class="flex justify-between items-start">
-                                    <div class="flex flex-col flex-1 space-y-2.5 min-w-0">
-                                        <div class="flex items-center space-x-2">
-                                            <input v-model="item.time" @change="save" type="time" class="text-[11px] font-black bg-slate-50 px-2 py-1.5 rounded-lg text-slate-900 w-22 border-none outline-none">
-                                            <span class="text-[9px] text-slate-300 font-black uppercase tracking-tighter">to</span>
-                                            <input v-model="item.timeLeave" @change="save" type="time" class="text-[11px] font-black bg-rose-50/70 px-2.5 py-2 rounded-lg text-rose-500 w-22 border-none outline-none">
+                            <div v-else class="rich-card p-3.5 space-y-3.5 flex items-start">
+                                <div class="drag-handle opacity-60 -ml-2 -mt-1">::</div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex flex-col flex-1 space-y-2.5 min-w-0">
+                                            <div class="flex items-center space-x-2">
+                                                <input v-model="item.time" @change="save" type="time" class="text-[11px] font-black bg-slate-50 px-2 py-1.5 rounded-lg text-slate-900 w-22 border-none outline-none">
+                                                <span class="text-[9px] text-slate-300 font-black uppercase tracking-tighter">to</span>
+                                                <input v-model="item.timeLeave" @change="save" type="time" class="text-[11px] font-black bg-rose-50/70 px-2.5 py-2 rounded-lg text-rose-500 w-22 border-none outline-none">
+                                            </div>
+                                            <input v-model="item.title" @input="save" placeholder="行程名稱" class="w-full poster-font text-lg bg-transparent border-none outline-none text-slate-900 focus:ring-0 truncate">
                                         </div>
-                                        <input v-model="item.title" @input="save" placeholder="行程標題" class="w-full poster-font text-lg bg-transparent border-none outline-none text-slate-900 focus:ring-0 truncate">
-                                    </div>
-                                    <div class="flex items-center">
-                                        <div class="drag-handle px-2 opacity-40">::</div>
                                         <button @click="requestRemoveItem(idx)" class="text-slate-300 hover:text-rose-500 text-xl font-bold p-1">×</button>
                                     </div>
-                                </div>
-                                <div class="space-y-3">
-                                    <div class="flex items-center space-x-2">
-                                        <select v-model="item.category" @change="save" 
-                                            class="text-[10px] font-black bg-slate-50 px-3 py-2.5 rounded-xl outline-none w-26 flex-shrink-0 text-center appearance-none border-none shadow-sm text-slate-700">
-                                            <option value="住宿">🏨 住宿</option><option value="美食">🍱 美食</option><option value="景點">🎟️ 景點</option><option value="購物">🛍️ 購物</option>
-                                        </select>
-                                        <div class="flex-1 flex items-center bg-slate-50 px-3 py-2.5 rounded-xl min-w-0">
-                                            <span class="text-xs mr-2 opacity-30">📍</span>
-                                            <input v-model="item.address" @input="save" placeholder="地址..." class="flex-1 text-[11px] font-medium bg-transparent outline-none truncate text-slate-600">
+                                    <div class="space-y-3 mt-3">
+                                        <div class="flex items-center space-x-2">
+                                            <select v-model="item.category" @change="save" 
+                                                class="text-[10px] font-black bg-slate-50 px-3 py-2.5 rounded-xl outline-none w-26 flex-shrink-0 text-center appearance-none border-none shadow-sm text-slate-700">
+                                                <option value="住宿">🏨 住宿</option><option value="美食">🍱 美食</option><option value="景點">🎟️ 景點</option><option value="購物">🛍️ 購物</option>
+                                            </select>
+                                            <div class="flex-1 flex items-center bg-slate-50 px-3 py-2.5 rounded-xl min-w-0">
+                                                <span class="text-xs mr-2 opacity-30">📍</span>
+                                                <input v-model="item.address" @input="save" placeholder="地址..." class="flex-1 text-[11px] font-medium bg-transparent outline-none truncate text-slate-600">
+                                            </div>
                                         </div>
+                                        <textarea v-model="item.note" @input="handleAutoHeight($event.target); save()" placeholder="筆記備註..." class="note-area" @focus="handleAutoHeight($event.target)"></textarea>
                                     </div>
-                                    <textarea v-model="item.note" @input="handleAutoHeight($event.target); save()" placeholder="筆記備註..." class="note-area" @focus="handleAutoHeight($event.target)"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -303,7 +320,7 @@
                     <div v-for="act in shoppingActivities" :key="'shop-act-'+act.id" class="bg-white rounded-[28px] shadow-sm border border-slate-100 overflow-visible mb-6">
                         <div class="bg-slate-50 px-6 py-4 flex justify-between items-center border-b border-slate-100">
                             <h4 class="text-sm poster-font text-slate-800 truncate mr-4">📍 {{ act.title || '地點' }}</h4>
-                            <button @click="addShopping(act)" class="text-[9px] px-4 py-2 bg-black text-white rounded-full poster-font shadow-lg">+ 新增清單</button>
+                            <button @click="addShopping(act)" class="text-[9px] px-5 py-2.5 bg-black text-white rounded-full poster-font shadow-lg">+ 新增清單</button>
                         </div>
                         <div class="p-5 space-y-8">
                             <div v-for="(shop, sIdx) in act.shopping" :key="shop.id" class="flex space-x-4 pb-6 border-b border-dashed border-slate-100 last:border-0 last:pb-0 relative">
@@ -334,14 +351,14 @@
             <!-- 備忘錄 Modal -->
             <div v-if="showMemo" class="fixed inset-0 modal-overlay flex items-center justify-center p-6" style="z-index: 4000;">
                 <div class="bg-white w-full max-w-sm rounded-[42px] shadow-2xl flex flex-col overflow-hidden max-h-[85vh]">
-                    <div class="bg-slate-900 px-8 py-6 flex justify-between items-center text-white">
+                    <div class="bg-slate-900 px-8 py-6 flex justify-between items-center text-white font-black">
                         <div class="flex items-center space-x-4"><span class="text-2xl">📝</span><h3 class="text-lg poster-font tracking-widest uppercase">Trip Memo</h3></div>
                         <button @click="showMemo = false" class="text-slate-400 text-3xl font-light">×</button>
                     </div>
                     <div class="p-8 flex-1 overflow-y-auto bg-slate-50/50">
                         <textarea v-model="currentTrip.memo" @input="handleAutoHeight($event.target); save()" 
-                            class="w-full bg-transparent outline-none text-slate-800 text-base font-medium leading-relaxed min-h-[400px] border-none focus:ring-0 resize-none p-0"
-                            placeholder="在此記錄旅程重要事項..."></textarea>
+                            class="w-full bg-transparent outline-none text-slate-800 text-base font-medium leading-relaxed min-h-[350px] border-none focus:ring-0 resize-none p-0"
+                            placeholder="在此記錄旅程重要記事..."></textarea>
                     </div>
                     <div class="p-6 bg-white border-t border-slate-100 text-center">
                         <button @click="showMemo = false" class="px-12 py-4 bg-slate-900 text-white rounded-2xl poster-font text-xs uppercase tracking-widest">Done</button>
@@ -352,7 +369,7 @@
             <!-- 計畫管理側邊欄 -->
             <div v-if="showTripList" class="fixed inset-0 modal-overlay flex items-end">
                 <div class="w-full bg-white rounded-t-[48px] p-10 max-h-[85vh] overflow-y-auto shadow-2xl relative border-t border-slate-100">
-                    <div class="flex justify-between items-center mb-10"><h3 class="text-xl poster-font text-slate-900 tracking-widest uppercase">Archive</h3><button @click="showTripList = false" class="text-slate-400 text-4xl font-light">×</button></div>
+                    <div class="flex justify-between items-center mb-10"><h3 class="text-xl poster-font text-slate-900 tracking-widest uppercase">My Trips</h3><button @click="showTripList = false" class="text-slate-400 text-4xl font-light">×</button></div>
                     <div class="space-y-5">
                         <div v-for="t in trips" :key="t.id" class="p-6 rounded-[32px] border-2 transition-all flex justify-between items-center shadow-sm" 
                             :class="t.id === activeTripId ? 'border-slate-900 bg-slate-50' : 'border-slate-100 bg-white'" @click="switchTrip(t.id)">
@@ -378,7 +395,7 @@
 
             <!-- 照片預覽 Overlay -->
             <div v-if="previewImageUrl" class="img-preview-overlay" @click="previewImageUrl = null">
-                <img :src="previewImageUrl" class="max-w-full max-h-full rounded-2xl shadow-2xl object-contain">
+                <img :src="previewImageUrl" class="max-w-full max-h-full rounded-2xl shadow-2xl object-contain scale-in">
                 <button class="absolute top-10 right-10 text-white text-4xl">×</button>
             </div>
 
@@ -402,7 +419,7 @@
             appId: "1:642234143171:web:13eb98dff98a7719c72d76"
         };
 
-        const appId = 'shared-trip-v15-seoul-imported';
+        const appId = 'shared-trip-v15-seoul-imported-fix-v21';
         const { createApp, ref, reactive, computed, watch, nextTick, onMounted } = Vue;
 
         createApp({
@@ -423,70 +440,43 @@
                 const confirmModal = reactive({ show: false, title: '', callback: null });
                 let db;
 
-                // 核心行程數據導航導入 (首爾 2026)
+                // 核心數據導入
                 const seoulTrip = {
-                    id: 't-seoul-2026',
-                    destination: '韓國首爾🇰🇷',
-                    startDate: '2026-04-29',
-                    endDate: '2026-05-04',
+                    id: 't-seoul-2026', destination: '韓國首爾🇰🇷', startDate: '2026-04-29', endDate: '2026-05-04',
                     memo: '💡 韓國電子入境卡：https://www.e-arrivalcard.go.kr/portal/main/index.do?locale=CH\n\n💡 記得隨身攜帶護照，退稅時需要用到！\n\n💡 韓國便利商店 (GS25、CU、7-11) 必買清單要注意～',
                     schedule: [
-                        { 
-                            date: '2026-04-29', 
-                            items: [
-                                { id: 's1-f', type: 'flight', time: '15:15', timeEnd: '18:45', airportStart: 'TPE (BR0160)', airportEnd: 'ICN (Terminal 1)', flightType: 'international' },
-                                { id: 's1-t1', type: 'transport', time: '19:15', timeEnd: '20:45', mode: 'car', duration: '90', note: '預約包車直達弘大住宿' },
-                                { id: 's1-a1', type: 'activity', time: '21:30', timeEnd: '22:30', title: '豚壽百 (弘大店)', category: '美食', note: '體驗正宗豬肉湯飯，營業至 24:00', address: '首爾特別市麻浦區弘益路6街56' },
-                                { id: 's1-a2', type: 'activity', time: '22:30', timeEnd: '23:30', title: 'Tangerine 住宿', category: '住宿', note: '辦理入房，超商美食體驗 (GS25/CU)' }
-                            ] 
-                        },
-                        { 
-                            date: '2026-04-30', 
-                            items: [
-                                { id: 's2-a1', type: 'activity', time: '09:00', timeEnd: '10:00', title: '早午餐', category: '美食', note: '弘大附近走路可達的咖啡店' },
-                                { id: 's2-t1', type: 'transport', time: '10:00', timeEnd: '10:40', mode: 'taxi', duration: '40' },
-                                { id: 's2-a2', type: 'activity', time: '10:40', timeEnd: '15:30', title: 'Zoolung Zoolung', category: '景點', note: '室內動物園半日遊' },
-                                { id: 's2-t2', type: 'transport', time: '15:30', timeEnd: '16:30', mode: 'taxi', duration: '60', note: '前往明洞' },
-                                { id: 's2-a3', type: 'activity', time: '16:30', timeEnd: '17:00', title: '大使館前換錢所', category: '景點', note: '預計換 10 萬台幣' },
-                                { id: 's2-a4', type: 'activity', time: '17:30', timeEnd: '19:30', title: '明洞商圈逛街', category: '購物', note: '晚餐可選：一隻雞、雪濃湯、生肉' },
-                                { id: 's2-a5', type: 'activity', time: '20:00', timeEnd: '21:30', title: '亂打秀 (Nanta)', category: '景點', note: '明洞劇場看秀' },
-                                { id: 's2-t3', type: 'transport', time: '22:00', timeEnd: '22:30', mode: 'taxi', duration: '30' }
-                            ] 
-                        },
-                        { 
-                            date: '2026-05-01', 
-                            items: [
-                                { id: 's3-a1', type: 'activity', time: '09:00', timeEnd: '12:00', title: '景福宮 韓服體驗', category: '景點', note: '09:00 到店準備，10:30 拍攝', address: '서울시 종로구 자하문로 19' },
-                                { id: 's3-a2', type: 'activity', time: '12:10', timeEnd: '13:30', title: '無垢屋 (午餐)', category: '美食', note: '12:00 開始遠端候補' },
-                                { id: 's3-a3', type: 'activity', time: '13:30', timeEnd: '16:00', title: '北村/三清洞/益善洞', category: '景點', note: '散步逛街，可去倫敦貝果博物館' },
-                                { id: 's3-a4', type: 'activity', time: '16:10', timeEnd: '19:00', title: '廣藏市場', category: '購物', note: '棉被攤、紫菜包飯、綠豆餅、生牛肉', address: '鍾路5街' },
-                                { id: 's3-a5', type: 'activity', time: '19:00', timeEnd: '21:00', title: '布帳馬車體驗', category: '美食', note: '當地夜晚特色攤販' }
-                            ] 
-                        },
-                        { 
-                            date: '2026-05-02', 
-                            items: [
-                                { id: 's4-a1', type: 'activity', time: '09:00', timeEnd: '10:00', title: 'Isaac Toast', category: '美食', note: '韓國必吃早餐吐司' },
-                                { id: 's4-a2', type: 'activity', time: '10:00', timeEnd: '13:00', title: 'Ocean Clinic 醫美', category: '景點', note: '江南站 5 號出口', address: '서울 서초구 강남대로 363' },
-                                { id: 's4-a3', type: 'activity', time: '14:00', timeEnd: '20:00', title: '弘大商圈', category: '購物', note: '馬場洞韓牛、藍色眼影年糕、Puradak 炸雞' }
-                            ] 
-                        },
-                        { 
-                            date: '2026-05-03', 
-                            items: [
-                                { id: 's5-a1', type: 'activity', time: '09:00', timeEnd: '11:20', title: '狎鷗亭商圈', category: '購物', note: 'Wiggle Wiggle, Gentle Monster, Tamburins' },
-                                { id: 's5-a2', type: 'activity', time: '11:30', timeEnd: '13:00', title: '烤豬肉 (燒肉)', category: '美食', note: '압구정고깃집 本店' },
-                                { id: 's5-a3', type: 'activity', time: '13:30', timeEnd: '17:30', title: '聖水洞', category: '購物', note: 'Fwee, emis, DIOR, OliveYoungN', address: '성수' },
-                                { id: 's5-a4', type: 'activity', time: '20:00', timeEnd: '22:00', title: '樂天超市', category: '購物', note: '購買伴手禮、糖果餅乾' }
-                            ] 
-                        },
-                        { 
-                            date: '2026-05-04', 
-                            items: [
-                                { id: 's6-t1', type: 'transport', time: '08:30', timeEnd: '09:40', mode: 'car', duration: '70', note: '包車前往機場' },
-                                { id: 's6-f', type: 'flight', time: '12:05', timeEnd: '14:05', airportStart: 'ICN (CI0165)', airportEnd: 'KHH', flightType: 'international' }
-                            ] 
-                        }
+                        { date: '2026-04-29', items: [
+                            { id: 's1-f', type: 'flight', time: '15:15', timeEnd: '18:45', airportStart: 'TPE (BR0160)', airportEnd: 'ICN (T1)', flightType: 'international' },
+                            { id: 's1-t1', type: 'transport', time: '19:15', timeEnd: '20:45', mode: 'car', duration: '90', note: '預約包車直達弘大' },
+                            { id: 's1-a1', type: 'activity', time: '21:30', timeEnd: '22:30', title: '豚壽百 (弘大店)', category: '美食', address: '首爾特別市麻浦區弘益路6街56' },
+                            { id: 's1-a2', type: 'activity', time: '22:30', timeEnd: '23:30', title: 'Tangerine 住宿', category: '住宿' }
+                        ]},
+                        { date: '2026-04-30', items: [
+                            { id: 's2-a1', type: 'activity', time: '09:00', timeEnd: '10:00', title: '早午餐', category: '美食' },
+                            { id: 's2-t1', type: 'transport', time: '10:00', timeEnd: '10:40', mode: 'taxi', duration: '40' },
+                            { id: 's2-a2', type: 'activity', time: '10:40', timeEnd: '15:30', title: 'Zoolung Zoolung', category: '景點' },
+                            { id: 's2-a3', type: 'activity', time: '16:30', timeEnd: '17:00', title: '換錢所 (大使館前)', category: '景點' },
+                            { id: 's2-a4', type: 'activity', time: '17:30', timeEnd: '19:30', title: '明洞逛街', category: '購物' },
+                            { id: 's2-a5', type: 'activity', time: '20:00', timeEnd: '21:30', title: '亂打秀 (Nanta)', category: '景點' }
+                        ]},
+                        { date: '2026-05-01', items: [
+                            { id: 's3-a1', type: 'activity', time: '09:00', timeEnd: '12:00', title: '景福宮 韓服體驗', category: '景點', address: '서울시 종로구 자하문로 19' },
+                            { id: 's3-a2', type: 'activity', time: '12:10', timeEnd: '13:30', title: '無垢屋 (午餐)', category: '美食' },
+                            { id: 's3-a3', type: 'activity', time: '16:10', timeEnd: '19:00', title: '廣藏市場', category: '購物' }
+                        ]},
+                        { date: '2026-05-02', items: [
+                            { id: 's4-a1', type: 'activity', time: '09:00', timeEnd: '10:00', title: 'Isaac Toast', category: '美食' },
+                            { id: 's4-a2', type: 'activity', time: '10:00', timeEnd: '13:00', title: 'Ocean Clinic 醫美', category: '景點', address: '서울 서초구 강남대로 363' }
+                        ]},
+                        { date: '2026-05-03', items: [
+                            { id: 's5-a1', type: 'activity', time: '09:00', timeEnd: '11:20', title: '狎鷗亭商圈', category: '購物' },
+                            { id: 's5-a2', type: 'activity', time: '13:30', timeEnd: '17:30', title: '聖水洞', category: '購物' },
+                            { id: 's5-a3', type: 'activity', time: '20:00', timeEnd: '22:00', title: '樂天超市', category: '購物' }
+                        ]},
+                        { date: '2026-05-04', items: [
+                            { id: 's6-t1', type: 'transport', time: '08:30', timeEnd: '09:40', mode: 'car', duration: '70' },
+                            { id: 's6-f', type: 'flight', time: '12:05', timeEnd: '14:05', airportStart: 'ICN (CI0165)', airportEnd: 'KHH', flightType: 'international' }
+                        ]}
                     ]
                 };
 
@@ -506,13 +496,10 @@
                                 onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'trips')), (snap) => {
                                     const data = [];
                                     snap.forEach(doc => data.push(doc.data()));
-                                    
-                                    // 如果雲端沒數據，且也沒有導入過，自動導入首爾計畫
                                     if (data.length === 0) {
                                         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', seoulTrip.id), seoulTrip);
                                         trips.value = [seoulTrip];
-                                        activeTripId.value = seoulTrip.id;
-                                        isStarted.value = true;
+                                        activeTripId.value = seoulTrip.id; isStarted.value = true;
                                     } else {
                                         trips.value = data;
                                         if (!activeTripId.value) { activeTripId.value = data[0].id; isStarted.value = true; }
@@ -553,7 +540,7 @@
                     const trip = { id, destination: newTripData.destination, startDate: newTripData.startDate, endDate: newTripData.endDate, schedule, memo: '' };
                     activeTripId.value = id; isStarted.value = true;
                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', id), trip);
-                    triggerToast("✨ 計畫已成功建立");
+                    triggerToast("✨ 計畫已建立");
                 };
 
                 const addItem = (type) => {
@@ -574,8 +561,7 @@
                 };
 
                 const requestRemoveShoppingItem = (act, sIdx) => {
-                    closeAllMenus();
-                    confirmModal.title = '要刪除此購物項？'; confirmModal.show = true;
+                    closeAllMenus(); confirmModal.title = '要刪除此購物項？'; confirmModal.show = true;
                     confirmModal.callback = () => { act.shopping.splice(sIdx, 1); save(); confirmModal.show = false; triggerToast("已刪除購物項"); };
                 };
 
@@ -585,11 +571,11 @@
                     confirmModal.callback = async () => {
                         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', id));
                         if (activeTripId.value === id) activeTripId.value = null;
-                        confirmModal.show = false; triggerToast("🗑️ 計畫已永久移除");
+                        confirmModal.show = false; triggerToast("🗑️ 計畫已移除");
                     };
                 };
 
-                const addShopping = (act) => { if(!act.shopping) act.shopping = []; act.shopping.push({ id: Date.now(), name: '', note: '', photo: null }); save(); triggerToast("✨ 購物清單已新增"); };
+                const addShopping = (act) => { if(!act.shopping) act.shopping = []; act.shopping.push({ id: Date.now(), name: '', note: '', photo: null }); save(); triggerToast("✨ 願望清單已更新"); };
 
                 const handleImage = async (shop, event) => {
                     const file = event.target.files[0];
@@ -604,7 +590,7 @@
                                 canvas.width = w; canvas.height = h;
                                 const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
                                 shop.photo = canvas.toDataURL('image/jpeg', 0.5);
-                                save(); triggerToast("📸 照片已成功同步");
+                                save(); triggerToast("📸 照片同步成功");
                             };
                         };
                     }
@@ -613,15 +599,28 @@
                 const handleAutoHeight = (el) => { el.style.height = '32px'; if (el.scrollHeight > 32) el.style.height = el.scrollHeight + 'px'; };
                 const formatShortDate = (d) => d ? d.split('-').slice(1).join('/') : '';
 
+                // 核心：拖曳靈敏度與觸摸優化
                 watch([activeDayIndex, isStarted, currentTab], () => {
                     if (isStarted.value && currentTab.value === 'schedule') {
                         nextTick(() => {
                             const el = document.getElementById('sortable-schedule');
                             if (el) {
-                                new Sortable(el, { handle: '.drag-handle', animation: 200, onEnd: (evt) => {
-                                    const items = [...activeDay.value.items]; const [moved] = items.splice(evt.oldIndex, 1);
-                                    items.splice(evt.newIndex, 0, moved); activeDay.value.items = items; save();
-                                }});
+                                new Sortable(el, { 
+                                    handle: '.drag-handle', 
+                                    animation: 150,
+                                    delay: 0, // 無延遲抓取
+                                    touchStartThreshold: 5, // 手指微移才開始
+                                    fallbackTolerance: 5, // 允許輕微抖動
+                                    ghostClass: 'sortable-ghost',
+                                    chosenClass: 'sortable-chosen',
+                                    forceFallback: true, // 確保移動端視覺統一
+                                    onEnd: (evt) => {
+                                        const items = [...activeDay.value.items];
+                                        const [moved] = items.splice(evt.oldIndex, 1);
+                                        items.splice(evt.newIndex, 0, moved);
+                                        activeDay.value.items = items; save();
+                                    }
+                                });
                             }
                             document.querySelectorAll('.note-area').forEach(el => handleAutoHeight(el));
                         });
