@@ -3,84 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>旅遊規劃 - 雲端版 V15</title>
-    <!-- 1. 先載入基礎工具 -->
+    <title>旅遊規劃 - 雲端共編版</title>
+    <!-- 載入基礎工具 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --milk-tea-bg: #FDF8F5; --milk-tea-primary: #D5BDAF; --milk-tea-dark: #8D7B70; }
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: var(--milk-tea-bg); color: var(--milk-tea-dark); touch-action: manipulation; }
-        .input-equal { width: 100%; background-color: white; border: 1px solid #E3D5CA; border-radius: 12px; padding: 12px; outline: none; }
-        .active-day { background-color: var(--milk-tea-primary); color: white; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: var(--milk-tea-bg); color: var(--milk-tea-dark); touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        .input-equal { width: 100%; background-color: white; border: 1px solid #E3D5CA; border-radius: 12px; padding: 14px; outline: none; }
+        .active-day { background-color: var(--milk-tea-primary); color: white; box-shadow: 0 4px 10px rgba(213, 189, 175, 0.3); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
-    <div id="app" class="max-w-md mx-auto min-h-screen relative flex flex-col">
+    <div id="app" class="max-w-md mx-auto min-h-screen relative flex flex-col bg-white shadow-2xl">
         
-        <!-- 載入/錯誤診斷畫面 -->
-        <div v-if="isLoading" class="flex-1 flex flex-col items-center justify-center bg-white p-10 text-center">
+        <!-- 核心載入畫面 -->
+        <div v-if="isLoading" class="flex-1 flex flex-col items-center justify-center p-10 text-center bg-white z-[100]">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#D5BDAF] mb-6"></div>
-            <p class="font-bold text-[#D5BDAF]">雲端系統啟動中...</p>
-            <p v-if="errorMsg" class="text-[10px] text-red-400 mt-4 bg-red-50 p-3 rounded-lg">{{ errorMsg }}</p>
+            <p class="font-bold text-[#D5BDAF] tracking-widest">雲端連線中...</p>
+            <div v-if="errorMsg" class="mt-8 p-5 bg-red-50 text-red-500 text-xs rounded-2xl border border-red-100 text-left">
+                <p class="font-bold mb-2">⚠️ 無法連線：</p>
+                {{ errorMsg }}
+                <hr class="my-3 border-red-100">
+                <p class="font-bold text-red-600">解決清單：</p>
+                <ul class="list-disc ml-4 mt-1 space-y-1">
+                    <li>Firebase -> Authentication -> 開啟「匿名」登入。</li>
+                    <li>Firebase -> Firestore Database -> Rules 設為 true 並發佈。</li>
+                </ul>
+            </div>
         </div>
 
         <!-- 初始建立頁 -->
-        <div v-if="!isStarted && !isLoading" class="flex-1 flex flex-col items-center justify-center p-10 bg-white">
-            <h1 class="text-xl font-bold mb-10 tracking-[0.2em]">建立旅遊計畫</h1>
-            <input v-model="newTrip.destination" type="text" placeholder="要去哪裡玩？" class="input-equal mb-4">
-            <button @click="createTrip" :disabled="!newTrip.destination" class="w-full py-4 bg-[#D5BDAF] text-white rounded-2xl font-bold shadow-lg">
-                開始同步規劃
-            </button>
+        <div v-if="!isStarted && !isLoading" class="flex-1 flex flex-col items-center justify-center p-10 space-y-8">
+            <div class="text-center">
+                <h1 class="text-2xl font-bold tracking-[0.3em] text-[#8D7B70]">我們的旅程</h1>
+                <p class="text-xs text-gray-400 mt-2">同步雲端資料，多人共同編輯</p>
+            </div>
+            <div class="w-full space-y-4">
+                <input v-model="newTrip.destination" type="text" placeholder="要去哪裡玩？" class="input-equal text-center text-lg">
+                <button @click="createTrip" :disabled="!newTrip.destination" class="w-full py-4 bg-[#D5BDAF] text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all text-sm tracking-widest">
+                    建立雲端同步計畫
+                </button>
+            </div>
         </div>
 
-        <!-- 主畫面 -->
+        <!-- 主編輯畫面 -->
         <template v-if="isStarted && !isLoading">
             <header class="p-6 bg-white border-b sticky top-0 z-50">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-bold">{{ currentTrip?.destination }}</h2>
-                    <div class="w-2 h-2 rounded-full bg-green-400"></div>
+                <div class="flex justify-between items-center mb-5">
+                    <h2 class="text-xl font-bold truncate text-[#8D7B70]">{{ currentTrip?.destination }}</h2>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 rounded-full" :class="isSynced ? 'bg-green-400' : 'bg-amber-400 animate-pulse'"></div>
+                        <span class="text-[10px] font-bold text-gray-300">{{ isSynced ? '已同步' : '儲存中' }}</span>
+                    </div>
                 </div>
-                <div class="flex space-x-2 overflow-x-auto pb-2">
-                    <button v-for="(day, idx) in currentTrip?.schedule" @click="activeDayIdx = idx" :class="activeDayIdx === idx ? 'active-day' : 'bg-gray-50'" class="shrink-0 px-5 py-2 rounded-xl text-xs font-bold transition-all">DAY {{ idx + 1 }}</button>
+                <!-- 天數選擇 -->
+                <div class="flex space-x-2 overflow-x-auto pb-2 no-scrollbar">
+                    <button v-for="(day, idx) in currentTrip?.schedule" :key="idx" 
+                        @click="activeDayIdx = idx" 
+                        :class="activeDayIdx === idx ? 'active-day' : 'bg-gray-50 text-gray-400'" 
+                        class="shrink-0 px-6 py-2.5 rounded-xl text-xs font-bold transition-all">
+                        DAY {{ idx + 1 }}
+                    </button>
                 </div>
             </header>
 
-            <main class="flex-1 p-5 space-y-4">
-                <button @click="addItem" class="w-full py-3 border-2 border-dashed border-[#D5BDAF] text-[#D5BDAF] rounded-2xl font-bold text-xs">+ 新增景點</button>
-                <div v-for="(item, idx) in currentTrip?.schedule[activeDayIdx].items" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex items-center space-x-3">
-                    <input v-model="item.time" @change="save" type="time" class="text-xs font-bold text-[#D5BDAF] outline-none border-none">
-                    <input v-model="item.title" @input="save" placeholder="景點名稱" class="flex-1 font-bold text-sm outline-none border-none">
-                    <button @click="currentTrip.schedule[activeDayIdx].items.splice(idx,1); save()" class="text-gray-300">×</button>
+            <main class="flex-1 p-5 space-y-4 overflow-y-auto">
+                <button @click="addItem" class="w-full py-4 border-2 border-dashed border-[#D5BDAF] text-[#D5BDAF] rounded-2xl font-bold text-xs active:bg-[#FDF8F5] transition-all">
+                    + 新增行程點
+                </button>
+                
+                <div v-for="(item, idx) in currentTrip?.schedule[activeDayIdx].items" :key="item.id" 
+                    class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-3">
+                    <input v-model="item.time" @change="save" type="time" class="text-xs font-bold text-[#D5BDAF] outline-none border-none bg-transparent">
+                    <input v-model="item.title" @input="save" placeholder="要去哪裡？" class="flex-1 font-bold text-sm outline-none border-none text-[#8D7B70]">
+                    <button @click="removeItem(idx)" class="text-gray-200 px-2 text-xl">×</button>
+                </div>
+                
+                <div v-if="currentTrip?.schedule[activeDayIdx].items.length === 0" class="py-20 text-center text-gray-300 text-xs">
+                    目前這天還沒安排行程，點擊按鈕開始吧！
                 </div>
             </main>
+            
+            <footer class="p-6 text-center bg-gray-50 border-t">
+                <button @click="isStarted = false" class="text-[10px] text-gray-400 border-b border-gray-200 pb-1">切換其他旅遊計畫</button>
+            </footer>
         </template>
     </div>
 
-    <!-- 2. 將 Firebase 載入與 Vue 邏輯合併，解決 Destructure 錯誤 -->
+    <!-- Firebase 邏輯 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // 使用您提供的正式金鑰
         const firebaseConfig = {
-            apiKey: "AIzaSyA81nyMXbE3AZVw-ffD-Wua",
-            authDomain: "travel-43eb1.firebaseapp.com",
-            projectId: "travel-43eb1",
-            storageBucket: "travel-43eb1.appspot.com",
-            messagingSenderId: "642234143171",
-            appId: "1:642234143171:web:13eb98dff90e0c05f56784"
+          apiKey: "AIzaSyA81nyMXbE3AZVw-ffD-WuaEu-HPS0TvPI",
+          authDomain: "travel-43eb1.firebaseapp.com",
+          projectId: "travel-43eb1",
+          storageBucket: "travel-43eb1.firebasestorage.app",
+          messagingSenderId: "642234143171",
+          appId: "1:642234143171:web:13eb98dff98a7719c72d76"
         };
 
-        const appId = 'my-final-trip-v15';
+        const appId = 'trip-v15-github-official-v5';
         const { createApp, ref, reactive, watch } = Vue;
 
-        createApp({
+        const app = createApp({
             setup() {
                 const isLoading = ref(true);
                 const isStarted = ref(false);
+                const isSynced = ref(true);
                 const errorMsg = ref("");
                 const trips = ref([]);
                 const activeTripId = ref(null);
@@ -88,11 +124,12 @@
                 const newTrip = reactive({ destination: '' });
                 let db;
 
-                const startApp = async () => {
+                const run = async () => {
                     try {
-                        const app = initializeApp(firebaseConfig);
-                        db = getFirestore(app);
-                        const auth = getAuth(app);
+                        const fbApp = initializeApp(firebaseConfig);
+                        db = getFirestore(fbApp);
+                        const auth = getAuth(fbApp);
+                        
                         await signInAnonymously(auth);
 
                         onAuthStateChanged(auth, (user) => {
@@ -108,28 +145,31 @@
                                     }
                                     isLoading.value = false;
                                 }, (err) => {
-                                    errorMsg.value = "Firebase 權限錯誤：請檢查 Firestore Rules 是否為 true";
+                                    errorMsg.value = "資料庫讀取失敗：請確認 Firebase Rules 規則。";
                                 });
                             }
                         });
                     } catch (e) {
-                        errorMsg.value = "啟動失敗：" + e.message;
+                        errorMsg.value = "連線失敗：" + e.message;
                     }
                 };
 
-                startApp();
+                run();
 
                 const currentTrip = ref(null);
                 watch([trips, activeTripId], () => {
-                    currentTrip.value = trips.value.find(t => t.id === activeTripId.value);
+                    currentTrip.value = trips.value.find(t => t.id === activeTripId.value) || null;
                 }, { immediate: true });
 
                 let timer;
                 const save = async () => {
                     if (!currentTrip.value) return;
+                    isSynced.value = false;
                     clearTimeout(timer);
                     timer = setTimeout(async () => {
-                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', currentTrip.value.id), JSON.parse(JSON.stringify(currentTrip.value)));
+                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'trips', currentTrip.value.id);
+                        await setDoc(ref, JSON.parse(JSON.stringify(currentTrip.value)));
+                        isSynced.value = true;
                     }, 800);
                 };
 
@@ -142,13 +182,21 @@
                 };
 
                 const addItem = () => {
-                    currentTrip.value.schedule[activeDayIdx.value].items.push({ time: '10:00', title: '' });
+                    currentTrip.value.schedule[activeDayIdx.value].items.push({ id: Date.now(), time: '12:00', title: '' });
                     save();
                 };
 
-                return { isLoading, isStarted, errorMsg, currentTrip, newTrip, createTrip, addItem, save, activeDayIdx };
+                const removeItem = (idx) => {
+                    if (confirm('確定要刪除嗎？')) {
+                        currentTrip.value.schedule[activeDayIdx.value].items.splice(idx, 1);
+                        save();
+                    }
+                };
+
+                return { isLoading, isStarted, isSynced, errorMsg, currentTrip, newTrip, createTrip, addItem, removeItem, save, activeDayIdx };
             }
-        }).mount('#app');
+        });
+        app.mount('#app');
     </script>
 </body>
 </html>
